@@ -2440,6 +2440,18 @@
             position: relative; padding-top: 56.25%; background: #000; border-radius: 14px; overflow: hidden;
         }
         .video-player-frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .video-player-fallback {
+            position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2;
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 10px 12px; border-radius: 8px; background: rgba(5,5,16,.92);
+            border: 1px solid rgba(0,212,255,.45); color: #dcefff; font-size: 12px;
+        }
+        .video-player-fallback a {
+            flex: 0 0 auto; color: #fff; background: #e62117; text-decoration: none;
+            padding: 7px 11px; border-radius: 6px; font-weight: 700; white-space: nowrap;
+        }
+        .video-player-fallback a:hover { background: #ff3b30; }
+        .video-player-fallback[hidden] { display: none; }
     </style>
     <div class="particles" id="particles"></div>
     <div class="app-container" id="appContainer"> 
@@ -2526,6 +2538,10 @@
             </div>
             <div class="video-player-frame-wrap">
                 <iframe id="videoPlayerFrame" title="YouTube video player" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+                <div class="video-player-fallback" id="videoPlayerFallback" hidden>
+                    <span>Having trouble loading the embedded player?</span>
+                    <a id="videoPlayerFallbackLink" href="#" target="_blank" rel="noopener noreferrer">Open directly on YouTube</a>
+                </div>
             </div>
         </div>
     </div>
@@ -3563,24 +3579,44 @@
             var mTitle = document.getElementById('videoPlayerTitle');
             var ytLink = document.getElementById('videoPlayerYtLink');
             var iframe = document.getElementById('videoPlayerFrame');
+            var fallback = document.getElementById('videoPlayerFallback');
+            var fallbackLink = document.getElementById('videoPlayerFallbackLink');
             if (!modal) return;
             if (mTitle) mTitle.textContent = title || '';
-            if (ytLink) ytLink.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
+            var directUrl = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
+            if (ytLink) ytLink.href = directUrl;
+            if (fallbackLink) fallbackLink.href = directUrl;
+            if (fallback) fallback.hidden = false;
             if (iframe) {
+                // Clear both navigation modes before assigning the next one.
+                // This prevents a stale cross-origin frame from covering the fallback.
+                iframe.src = 'about:blank';
+                iframe.srcdoc = '';
                 if (window.location.protocol === 'file:') {
                     // YouTube Error 153 is unavoidable for embeds opened from file://
                     // because the browser cannot send an HTTP Referer header. Show a
                     // useful fallback instead of leaving a broken player on screen.
-                    iframe.srcdoc = '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050510;color:#e6f7ff;font-family:Inter,Arial,sans-serif;text-align:center;padding:24px">' +
-                        '<div style="font-size:48px;margin-bottom:16px">▶</div>' +
-                        '<h2 style="color:#00d4ff;margin-bottom:12px">Run this page through a web server</h2>' +
-                        '<p style="max-width:560px;color:#8899a6;line-height:1.6">YouTube blocks embedded playback from local files (Error 153). Use the <strong style="color:#e6f7ff">Open on YouTube</strong> button above, or host this file over HTTP/HTTPS.</p>' +
+                    iframe.srcdoc = '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#12121a;color:#e6f7ff;font-family:Arial,sans-serif;text-align:center;padding:24px">' +
+                        '<div style="font-size:56px;color:#ff0000;margin-bottom:16px">▶</div>' +
+                        '<h2 style="color:#00d4ff;margin:0 0 12px">YouTube cannot play local files</h2>' +
+                        '<p style="max-width:560px;color:#b8c4cc;line-height:1.6;margin:0">Error 153 occurs when this page is opened as <strong style="color:#fff">file://</strong>. Use the <strong style="color:#fff">Open on YouTube</strong> button above, or host this file over HTTP/HTTPS for embedded playback.</p>' +
                         '</div>';
+                    // A click on a video card is a user gesture, so hand the
+                    // video to YouTube directly when local embedding is blocked.
+                    var opened = window.open(ytLink.href, '_blank', 'noopener,noreferrer');
+                    if (!opened) {
+                        iframe.srcdoc = '<div style="height:100%;display:flex;align-items:center;justify-content:center;background:#12121a;font-family:Arial,sans-serif;text-align:center;padding:24px">' +
+                            '<a href="' + ytLink.href + '" target="_blank" rel="noopener noreferrer" style="color:#00d4ff;font-size:18px;font-weight:bold">Open this video on YouTube</a>' +
+                            '</div>';
+                    }
                 } else {
-                    var embedUrl = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
-                        '?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=' +
-                        encodeURIComponent(window.location.origin);
-                    iframe.srcdoc = '';
+                    // Start paused so browser autoplay policies cannot produce a
+                    // blank/black player. The user can press YouTube's play button.
+                    var embedUrl = 'https://www.youtube.com/embed/' + encodeURIComponent(id) +
+                        '?autoplay=0&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1';
+                    if (/^https?:$/.test(window.location.protocol)) {
+                        embedUrl += '&origin=' + encodeURIComponent(window.location.origin);
+                    }
                     iframe.src = embedUrl;
                 }
             }
@@ -3591,8 +3627,10 @@
         function videoClosePlayer() {
             var modal = document.getElementById('videoPlayerModal');
             var iframe = document.getElementById('videoPlayerFrame');
+            var fallback = document.getElementById('videoPlayerFallback');
             if (modal) modal.classList.remove('active');
             if (iframe) iframe.src = '';
+            if (fallback) fallback.hidden = true;
             document.body.style.overflow = '';
         }
 
@@ -5271,6 +5309,7 @@ async function handleSearch(e) {
                 return "A movie is playing. Are you sure you want to leave?";
             }
         };
+        }
 
         window.onbeforeunload = function() {
             if (document.getElementById('movieModal').classList.contains('active')) {
