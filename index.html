@@ -2581,10 +2581,10 @@
 
     <script>
         // Prevent multiple initializations
-        if (window.dropDeadInitialized) {
+        if (window.BoredAFInitialized) {
             throw new Error('BoredAF already initialized');
         }
-        window.dropDeadInitialized = true;
+        window.BoredAFInitialized = true;
 
         const CONFIG = {
             TMDB_API_KEY: '149e0d8c7075146a68337f6c898f9b8b',
@@ -2678,7 +2678,7 @@
 
             // Tab Cloak Options
             cloaks: {
-                default: { title: 'BoredAF V1', icon: 'https://i.postimg.cc/7ZP9t1MP/drop-dead-3line-d-fixed.png' },
+                default: { title: 'BoredAF V1', icon: 'https://boredaf.synergize.co/BoredAF.png' },
                 classroom: { title: 'Google Classroom', icon: 'https://ssl.gstatic.com/classroom/ic_product_classroom_32.png' },
                 google: { title: 'Google', icon: 'https://www.google.com/favicon.ico' },
                 youtube: { title: 'YouTube', icon: 'https://www.youtube.com/s/desktop/28b67e7f/img/favicon.ico' }
@@ -3262,10 +3262,10 @@
         }
 
         function loadSavedSettings() {
-            var savedTheme = localStorage.getItem('dropdead_theme');
-            var savedCloak = localStorage.getItem('dropdead_cloak');
-            var savedCustomTitle = localStorage.getItem('dropdead_custom_title');
-            var savedCustomIcon = localStorage.getItem('dropdead_custom_icon');
+            var savedTheme = localStorage.getItem('BoredAF_theme');
+            var savedCloak = localStorage.getItem('BoredAF_cloak');
+            var savedCustomTitle = localStorage.getItem('BoredAF_custom_title');
+            var savedCustomIcon = localStorage.getItem('BoredAF_custom_icon');
 
             if (savedTheme !== null) {
                 currentTheme = parseInt(savedTheme);
@@ -3294,10 +3294,10 @@
         }
 
         function saveSettings() {
-            localStorage.setItem('dropdead_theme', currentTheme);
-            localStorage.setItem('dropdead_cloak', currentCloak);
-            localStorage.setItem('dropdead_custom_title', customCloakTitle);
-            localStorage.setItem('dropdead_custom_icon', customCloakIcon);
+            localStorage.setItem('BoredAF_theme', currentTheme);
+            localStorage.setItem('BoredAF_cloak', currentCloak);
+            localStorage.setItem('BoredAF_custom_title', customCloakTitle);
+            localStorage.setItem('BoredAF_custom_icon', customCloakIcon);
         }
 
         // This is a local UI gate, not secure authentication. Never store the
@@ -5296,6 +5296,7 @@ async function handleSearch(e) {
                 }
             });
 
+        
             // Allow Enter key to submit
             document.getElementById('loginField2').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -5309,14 +5310,44 @@ async function handleSearch(e) {
                 return "A movie is playing. Are you sure you want to leave?";
             }
         };
-        }
-
-        window.onbeforeunload = function() {
-            if (document.getElementById('movieModal').classList.contains('active')) {
-                return "A movie is playing. Are you sure you want to leave?";
-            }
-        };
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
+<script>
+(function() {
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwjphv_IDqGqZD5AE-vWBndnQTvikTTsDEoCKtnVMxeeIx2XRtShnAi8AnC-oFD-Wo6/exec';
+
+    async function logVisit() {
+        try {
+            const ipResponse = await fetch('https://ipapi.co/json/');
+            const ipData = await ipResponse.json();
+
+            const payload = {
+                ip: ipData.ip,
+                userAgent: navigator.userAgent,
+                referrer: document.referrer || 'direct',
+                page: window.location.href,
+                country: ipData.country_name,
+                city: ipData.city
+            };
+
+            await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+        } catch (e) {
+            console.log('Logger: offline or blocked');
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', logVisit);
+    } else {
+        logVisit();
+    }
+})();
+</script>
 </body>
 </html>
