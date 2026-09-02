@@ -3284,7 +3284,26 @@
             localStorage.setItem('dropdead_custom_icon', customCloakIcon);
         }
 
+        // This is a local UI gate, not secure authentication. Never store the
+        // entered password; only persist the unlock state in a cookie.
+        function hasMoviesAccess() {
+            return document.cookie.split('; ').some(function(cookie) {
+                return cookie === 'boredaf_movies_unlocked=1';
+            }) || localStorage.getItem('boredaf_movies_unlocked') === '1';
+        }
+
+        function grantMoviesAccess() {
+            // Max-Age: 30 days. SameSite limits cross-site cookie sending.
+            document.cookie = 'boredaf_movies_unlocked=1; Max-Age=2592000; Path=/; SameSite=Lax';
+            // file:// pages often cannot persist cookies, so retain a local-only
+            // fallback for offline previews while still using the cookie normally.
+            localStorage.setItem('boredaf_movies_unlocked', '1');
+        }
+
         function showSection(sectionId) {
+            if (sectionId === 'movies-tv' && !hasMoviesAccess()) {
+                sectionId = 'login';
+            }
             currentSection = sectionId;
             isSearchResults = false;
             lastSearchQuery = '';
@@ -3548,14 +3567,22 @@
             if (mTitle) mTitle.textContent = title || '';
             if (ytLink) ytLink.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
             if (iframe) {
-                var embedUrl = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
-                    '?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1';
-                // YouTube rejects some embeds without a valid HTTP(S) origin.
-                // Do not append location.origin for local file:// previews, where it is "null".
-                if (/^https?:$/.test(window.location.protocol)) {
-                    embedUrl += '&origin=' + encodeURIComponent(window.location.origin);
+                if (window.location.protocol === 'file:') {
+                    // YouTube Error 153 is unavoidable for embeds opened from file://
+                    // because the browser cannot send an HTTP Referer header. Show a
+                    // useful fallback instead of leaving a broken player on screen.
+                    iframe.srcdoc = '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050510;color:#e6f7ff;font-family:Inter,Arial,sans-serif;text-align:center;padding:24px">' +
+                        '<div style="font-size:48px;margin-bottom:16px">▶</div>' +
+                        '<h2 style="color:#00d4ff;margin-bottom:12px">Run this page through a web server</h2>' +
+                        '<p style="max-width:560px;color:#8899a6;line-height:1.6">YouTube blocks embedded playback from local files (Error 153). Use the <strong style="color:#e6f7ff">Open on YouTube</strong> button above, or host this file over HTTP/HTTPS.</p>' +
+                        '</div>';
+                } else {
+                    var embedUrl = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
+                        '?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=' +
+                        encodeURIComponent(window.location.origin);
+                    iframe.srcdoc = '';
+                    iframe.src = embedUrl;
                 }
-                iframe.src = embedUrl;
             }
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -5166,8 +5193,8 @@ async function handleSearch(e) {
                         '<div class="login-logo">' +
                             '<img src="https://boredaf.synergize.co/BoredAF.png" alt="BoredAF">' +
                         '</div>' +
-                        '<div class="login-title">Login to BoredAF</div>' +
-                        '<div class="login-subtitle">Enter your credentials to continue</div>' +
+                        '<div class="login-title">Unlock Movies &amp; TV</div>' +
+                        '<div class="login-subtitle">Sign in to unlock the Movies &amp; TV section on this device</div>' +
                         '<div class="login-shield">' +
                             '<i class="ri-shield-check-line"></i> Secure connection' +
                         '</div>' +
@@ -5199,8 +5226,12 @@ async function handleSearch(e) {
                     return;
                 }
 
-                msg.className = 'login-msg error';
-                msg.textContent = 'Sign-in is not configured for this static page.';
+                grantMoviesAccess();
+                msg.className = 'login-msg success';
+                msg.textContent = 'Movies & TV unlocked. Loading...';
+                setTimeout(function() {
+                    showSection('movies-tv');
+                }, 250);
             });
 
             // Allow Enter key to submit
